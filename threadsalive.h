@@ -1,5 +1,5 @@
-/*
- * 
+/* Ashley Jones	
+ * Laura Slade
  */
 
 #ifndef __THREADSALIVE_H__
@@ -27,7 +27,7 @@ typedef struct {
    *************************** */
 
 void ta_libinit(void);
-void ta_create(void (*)(void *), void *);
+void ta_create(void (*)(void *), void *); 
 void ta_yield(void);
 int ta_waitall(void);
 
