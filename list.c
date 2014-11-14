@@ -21,41 +21,40 @@ void list_clear(struct node *list) {
 }
 
 void list_print(const struct node *list) {
-    int i = 0;
+    //int i = 0;
     printf("*** List Contents BEGIN ***\n");
     while (list != NULL) {
-        printf("%d\n", list->value);
+        printf("%d\n", list->id);
         list = list->next;
     }
     printf("*** List Contents END ***\n");
 }
 
-void list_insert(int value, struct node **head) {
+void list_append(struct node *added, struct node **head, struct node **tail) {
 
 /* This fucntion insterts a new link in the linked list in the neumerically sorted correct position */
 
-    struct node *new = malloc(sizeof(struct node));
-    new->value = value;
-
-    if(*head == NULL || (**head).value > value) {
- 	new->next = *head;
-        *head = new;
+    if(*head == NULL) {
+ 	added->next = *head;
+        *head = added;
+        *tail = added;
 	return;
     }
-    // sort and find the right place 
-    struct node *previous = *head;
-    struct node *curr = previous->next;
-    while(curr != NULL) { //if happens to be placed before the very end of the linked list, break
-        if(curr->value > value) {
-            new->next = curr;
-            previous->next = new;
-            return;
-        }
-	previous = curr;
-	curr = curr->next;
-    }
-    previous->next = new;
-    new->next = NULL;
+   else {
+       struct node *tmp = *tail;
+       tmp->next = added;
+       added->next = NULL;
+       *tail = added;
+/*
+       (*tail)->next = added;
+       added->next = NULL;
+*/
+   }
+}
+
+void list_insert_second(struct node *curr, struct node *head) {
+    curr->next = head->next;
+    head->next = curr;
 }
 
 

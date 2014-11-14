@@ -10,6 +10,8 @@
    *************************** */
 
 typedef struct {
+    int value;
+    //talock_t *lock;
 
 } tasem_t;
 

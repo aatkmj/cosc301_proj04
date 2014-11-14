@@ -13,17 +13,40 @@
 #include <ucontext.h>
 #include "threadsalive.h"
 #include "list.h"
+#include "list.c"
+
+//use linked list - then link all back to main
+//swap between the main thread and the head of the list
+//no good to have global blocked
+//only times you run waitall you are main thread
+//user thread calls yield
+//current thread that called yield should be the head, put on end
+//swap between that one and new head of ready queue 
+//when something finishes it goes to waitall - then free memory
+//then grab next yield
+//no loop in yield
+//while some thread left on ready queue swap to
+//main as a global - never on queue (not a node) (doesn't point to anything) - never make it or get it 
+//libinit shoudln't do anything.....
+
+//global int - each had a new id (to help debugging) - so have an int id in the node
+
+//head of ready queue - either just ran or just finished - don't swap until yield 
+//have just the context not a pointer; malloc node, get context, make context, link
+//free stack AND free node (2 mallocs and 2 frees)
+
+//global variable: head of runable queue - pointer to a node
+struct node *head = NULL;
+//global variable: tail of runable queue - pointer to a node
+struct node *tail = NULL;
+//global variable: context id counter (0 as main thread)
+static int context_id = 1;
+//global variable: main thread
+static ucontext_t main_thread;
 
 
-//global variable: head of runable queue - pointer to a context
-static ucontext_t *head = NULL;
-//global variable: tail of runable queue - pointer to a context but it's NULL
-static ucontext_t *tail = NULL;
-
-//global variable: head of blocked queue - pointer to a context
-static ucontext_t *blocked_head = NULL;
-//global variable: tail of blocked queue - pointer to a context but it's NULL
-static ucontext_t *blocked_tail = NULL;
+//global variable: counter for semaphore
+static int counter = 0;
 
 /* ***************************** 
      stage 1 library functions
@@ -44,11 +67,13 @@ allocate new context, initialze context using getcontext; front of queue is this
 ucontext structure for main - initialize run queue with run
 */
 
-    ucontext_t main_thread;
+   
     getcontext(&main_thread);
     main_thread.uc_link = NULL;
+/*
     head = &main_thread;
     tail = &main_thread;
+    */
 
     return;
 }
@@ -57,21 +82,30 @@ void ta_create(void (*func)(void *), void *arg) {
     //create NEW threads
     //assume main thread and main thread context already exists
     //stick at end of run queue
-    #define STACKSIZE 128
+
+    struct node *new = malloc(sizeof(struct node));
+
+    #define STACKSIZE 128000
     unsigned char *stack1 = (unsigned char *)malloc(STACKSIZE);
     assert(stack1);
-    ucontext_t ctx;
-    getcontext(&ctx);
-  
-    printf("1/2 way through create....\n");
 
-//link and append to queue
-    tail->uc_link = &ctx;
-    tail = &ctx;
+     
+    getcontext(&new->context);
+
+    new->context.uc_stack.ss_sp = stack1;
+    new->context.uc_stack.ss_size = STACKSIZE;
+    new->context.uc_link = &main_thread;
+
+    new->id = context_id;
+    context_id ++;
+
+//link and append to ready queue
+    list_append (new, &head, &tail);
  
 //make context for thread
-    makeconext(tail, (void (*)(void))func, arg);
-    printf("make context done\n");
+    
+    makecontext(&new->context, (void (*)(void))func, 1, arg); 
+    
     return;
 }
 
@@ -87,22 +121,35 @@ void ta_yield(void) {
 
 //if woke up bc another thread returned (you will not be the head)
 //then deallocated the current head and put head as next one
-    tail->uc_link = head; //tail points to head
-    tail = tail->uc_link; //tail is updated to head
+    /*tail->uc_link = head; //tail points to head
+    tail = head; //tail is updated to head ::::tail->uc_link
     head = head->uc_link; //head updated to new head
     tail->uc_link = NULL; //tail points to null
+    */
+
+    /*
+    ucontext_t *temp = head;
+    temp->uc_link = NULL;
+    head = head->uc_link;
+    tail->uc_link = temp;
+    tail = tail->uc_link;
 
     ucontext_t *curr = malloc(sizeof(tail));
     curr = tail;
-    
-    swapcontext(tail, head); 
 
 //wakes up
     while(head != curr) { //in case multiple threads have finished
-        ucontext_t *temp = head;
-        head = head->uc_link;
-        free(temp);
+
     }    
+    */
+    
+    //move current head to the tail and update head to the next in line
+    struct node *temp = head;
+    head = head->next; 
+    temp->next = NULL;
+    list_append(temp, &head, &tail);
+    
+    swapcontext(&tail->context, &head->context); 
     
     return;
 }
@@ -116,7 +163,7 @@ int ta_waitall(void) {
 //threads that are alive but can't be run right now (waiting)
 
 //am i the only thing in the queue? no? yield (while loop)
-
+    /*
     while(head->uc_link != NULL) {
         ta_yield();
     }
@@ -124,19 +171,44 @@ int ta_waitall(void) {
         return -1; //if anything on the blocked queue, return -1
     }
     return 0; //nothing on the blocked queue
-  
- 
+    */
+    swapcontext (&main_thread, &head->context);
+
+    while(head != NULL){
+        struct node *temp = head;
+        head = head->next;
+        free(temp->context.uc_stack.ss_sp); //free the context
+        free(temp); //free the node
+        swapcontext (&main_thread, &head->context);
+    }
+   
+    return 0;
 }
 
 
 /* ***************************** 
      stage 2 library functions
    ***************************** */
+//mutex is a binary semaphore - 
+//initialize it to one
+//only one thread running at a time
+//just add to a (local) blocked queue and yeild thread! (don't spin wait bc then you will spin forever)
+
+//on blocked queue - next thing it should do:
+//WAIT: while value == 0, add to blocked queue, yeild, value -= 1
+//POST: value+=1; if blocked queue != empty, put head of blocked on ready queue (insert as the second node - to keep the currently running thread as the head)
 
 void ta_sem_init(tasem_t *sem, int value) {
+    //make blocked queue here?
+    assert(value >= 0);
+    sem->value = value;
+    //ta_lock_init(&sem->lock);
+    //set value of counter
+    
 }
 
 void ta_sem_destroy(tasem_t *sem) {
+    //"destroy" aka free counter?
 }
 
 void ta_sem_post(tasem_t *sem) {
@@ -152,6 +224,9 @@ void ta_lock_destroy(talock_t *mutex) {
 }
 
 void ta_lock(talock_t *mutex) {
+
+//don't yield during critical section
+
 }
 
 void ta_unlock(talock_t *mutex) {

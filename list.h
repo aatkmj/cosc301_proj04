@@ -3,7 +3,8 @@
 
 /* your list data structure declarations */
 struct node {
-    int value;
+    ucontext_t context; 
+    int id;
     struct node *next; 
 };
 
@@ -11,8 +12,8 @@ struct node {
 
 void list_clear(struct node *list);
 void list_print(const struct node *list);
-void list_insert(int value, struct node **head);
-
+void list_append(struct node *added,struct node **head, struct node **tail);
+void list_insert_second(struct node *curr, struct node *head);
 
 
 #endif // __LIST_H__
