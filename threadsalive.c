@@ -45,8 +45,9 @@ static int context_id = 1;
 static ucontext_t main_thread;
 
 
-//global variable: counter for semaphore
-static int counter = 0;
+//global varaiable: semaphore id
+static int sem_id = 0;
+
 
 /* ***************************** 
      stage 1 library functions
@@ -200,11 +201,17 @@ int ta_waitall(void) {
 
 void ta_sem_init(tasem_t *sem, int value) {
     //make blocked queue here?
-    assert(value >= 0);
+    /*assert(value >= 0);
     sem->value = value;
     //ta_lock_init(&sem->lock);
     //set value of counter
+    */
     
+    sem->counter = value;
+    sem->id = sem_id;
+    sem->blocked_h = NULL;
+    sem->blocked_t = NULL;
+
 }
 
 void ta_sem_destroy(tasem_t *sem) {
@@ -212,9 +219,26 @@ void ta_sem_destroy(tasem_t *sem) {
 }
 
 void ta_sem_post(tasem_t *sem) {
+    sem->counter++;
+    if(sem->blocked_h != NULL) {
+        struct node *temp = sem->blocked_h;
+        temp->next = NULL;
+        sem->blocked_h = sem->blocked_h->next;
+        list_insert_second(temp, head);
+    }
 }
 
 void ta_sem_wait(tasem_t *sem) {
+    //check
+    while(sem->counter == 0) {
+        struct node *temp = malloc(sizeof(struct node));
+        temp = head;
+        temp->next = NULL;
+        list_append(temp, &sem->blocked_h, &sem->blocked_t);
+        yield();
+    }
+    //decrement
+    sem->counter--;
 }
 
 void ta_lock_init(talock_t *mutex) {

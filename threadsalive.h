@@ -5,18 +5,25 @@
 #ifndef __THREADSALIVE_H__
 #define __THREADSALIVE_H__
 
+#include "list.h"
+
 /* ***************************
         type definitions
    *************************** */
 
 typedef struct {
-    int value;
-    //talock_t *lock;
+    int counter;
+    int id;
+    struct node *blocked_h;
+    struct node *blocked_t;
 
 } tasem_t;
 
 typedef struct {
-
+    int value;
+    int id;
+    struct node *blocked_h;
+    struct node *blocked_t;
 } talock_t;
 
 typedef struct {
