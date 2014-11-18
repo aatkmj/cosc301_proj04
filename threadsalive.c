@@ -212,7 +212,7 @@ int ta_waitall(void) {
 		}
 		
     if (killed != 0){
-	return -1;
+		return -1;
     }
     return 0;
 }
@@ -272,7 +272,6 @@ void ta_sem_wait(tasem_t *sem) {
 		temp = head;
 		temp->next = NULL;
 */
-
 		temp->context = head->context;
 		temp->id = head->id;
 		temp->next = NULL;
@@ -342,22 +341,45 @@ void ta_unlock(talock_t *mutex) {
    ***************************** */
 
 void ta_cond_init(tacond_t *cond) {
-	/*cond->var = 0;
+	cond->var = 0;
 	cond->cond_h = NULL;
 	cond->cond_t = NULL;
-	*/
+	
 }
 
 void ta_cond_destroy(tacond_t *cond) {
-	killed += list_clear(&cond->cond_h);
+	killed += list_clear(cond->cond_h);
 }
 
 void ta_wait(talock_t *mutex, tacond_t *cond) {
-	/*while (cond->var ==0){
-		struct node *temp = head;*/
-	    
+	while (cond->var ==0){
+	  //put all threads on blocked queue when cond = false
+ 		struct node *temp = malloc(sizeof(struct node));
+		temp->context = head->context;
+		temp->id = head->id;
+		temp->next = NULL;
+        list_append(temp, &cond->cond_h, &cond->cond_t);
+        came_from_sem = 1; //set true 
+//implicitly release locks
+		ta_unlock(mutex);  
+        ta_yield();
+
+	}   
+	if (cond->var == 1){
+		return;
+	//allow threads to pass through to critical section. (don't need to do anything here threads will just fall on through to critical section.)
+	}
 }
 
 void ta_signal(tacond_t *cond) {
+	cond->var = 1;
+	if(cond->cond_h != NULL) {
+        struct node *temp = cond->cond_h;
+		cond->cond_h = cond->cond_h->next;
+        temp->next = NULL;
+        
+        list_insert_second(temp, &head, &tail);
+    }
+	
 }
 
