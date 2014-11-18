@@ -248,6 +248,7 @@ void ta_sem_init(tasem_t *sem, int value) {
 
 void ta_sem_destroy(tasem_t *sem) {
     killed += list_clear(sem->blocked_h); //make sure to also free stack for thread!
+	free(sem);
 }
 
 void ta_sem_post(tasem_t *sem) {
@@ -349,10 +350,11 @@ void ta_cond_init(tacond_t *cond) {
 
 void ta_cond_destroy(tacond_t *cond) {
 	killed += list_clear(cond->cond_h);
+	free(cond);
 }
 
 void ta_wait(talock_t *mutex, tacond_t *cond) {
-	while (cond->var == 0){
+	while(cond->var == 0){
 	  //put all threads on blocked queue when cond = false
  		struct node *temp = malloc(sizeof(struct node));
 		temp->context = head->context;
