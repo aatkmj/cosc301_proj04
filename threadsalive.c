@@ -366,7 +366,7 @@ void ta_wait(talock_t *mutex, tacond_t *cond) {
 
 	}   
 	if (cond->var == 1){
-		return;
+		ta_lock(mutex);
 	//allow threads to pass through to critical section. (don't need to do anything here threads will just fall on through to critical section.)
 	}
 }
