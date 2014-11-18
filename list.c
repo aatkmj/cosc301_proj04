@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "list.h"
+#include <ucontext.h>
+
 
 /* Names: Ashley Jones, Laura Slade 
  * Project 1 - Updated for Project 4
@@ -12,12 +14,17 @@
 
 
 
-void list_clear(struct node *list) {
+int list_clear(struct node *list) {
+    int count = 0;
     while (list != NULL) {
         struct node *tmp = list;
         list = list->next;
-        free(tmp);
+        free(tmp->context.uc_stack.ss_sp); //free the context
+        free(tmp); //free the node
+        //free(tmp);
+        count++;
     }
+    return count;
 }
 
 void list_print(const struct node *list) {
@@ -52,9 +59,19 @@ void list_append(struct node *added, struct node **head, struct node **tail) {
    }
 }
 
-void list_insert_second(struct node *curr, struct node *head) {
-    curr->next = head->next;
-    head->next = curr;
+void list_insert_second(struct node *curr, struct node **head, struct node **tail) {
+	struct node *h = *head;
+	if (h->next != NULL) {
+    	curr->next = h->next;
+   	 	h->next = curr;
+		*head = h;
+       }
+	else {
+		h->next = curr;
+		curr->next = NULL;
+		*head = h;
+	    *tail = curr;
+		}
 }
 
 

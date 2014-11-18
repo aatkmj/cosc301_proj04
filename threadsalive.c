@@ -2,6 +2,7 @@
  * Laura Slade
  * Due: November 17, 2014
  * With thanks to Professor Stratton for helping us understand Stage 1 
+ * All stages and code were done together
  */
 
 #include <stdio.h>
@@ -47,6 +48,10 @@ static ucontext_t main_thread;
 
 //global varaiable: semaphore id
 static int sem_id = 0;
+//global variable: killed threads from sem destroy
+static int killed = 0;
+//global variable: yield call came from sem wait (0 is no, 1 is yes)
+static int came_from_sem = 0; 
 
 
 /* ***************************** 
@@ -70,7 +75,7 @@ ucontext structure for main - initialize run queue with run
 
    
     getcontext(&main_thread);
-    main_thread.uc_link = NULL;
+    //main_thread.uc_link = NULL;
 /*
     head = &main_thread;
     tail = &main_thread;
@@ -143,14 +148,26 @@ void ta_yield(void) {
 
     }    
     */
-    
+    if(came_from_sem == 0) {
     //move current head to the tail and update head to the next in line
-    struct node *temp = head;
-    head = head->next; 
-    temp->next = NULL;
-    list_append(temp, &head, &tail);
+    	struct node *temp = head;
+    	head = head->next; 
+    	temp->next = NULL;
+    	list_append(temp, &head, &tail);
     
-    swapcontext(&tail->context, &head->context); 
+    	swapcontext(&tail->context, &head->context); 
+	}
+	else {
+		struct node *temp = head;
+		if (head != NULL) {
+			if (head->next == NULL){
+				return;
+			}
+			head = head->next;
+			came_from_sem = 0; //reset to 0 before leave function 
+			swapcontext(&temp->context, &head->context);		
+		}
+	}
     
     return;
 }
@@ -175,14 +192,22 @@ int ta_waitall(void) {
     */
     swapcontext (&main_thread, &head->context);
 
-    while(head != NULL){
+    while(head->next != NULL){
         struct node *temp = head;
         head = head->next;
         free(temp->context.uc_stack.ss_sp); //free the context
         free(temp); //free the node
         swapcontext (&main_thread, &head->context);
     }
-   
+	if (head != NULL) {
+	    struct node *temp = head;
+        free(temp->context.uc_stack.ss_sp); //free the context
+        free(temp); //free the node
+		}
+		
+    if (killed != 0){
+	return -1;
+    }
     return 0;
 }
 
@@ -209,13 +234,14 @@ void ta_sem_init(tasem_t *sem, int value) {
     
     sem->counter = value;
     sem->id = sem_id;
+    sem_id++;
     sem->blocked_h = NULL;
     sem->blocked_t = NULL;
 
 }
 
 void ta_sem_destroy(tasem_t *sem) {
-    //"destroy" aka free counter?
+    killed += list_clear(sem->blocked_h); //make sure to also free stack for thread!
 }
 
 void ta_sem_post(tasem_t *sem) {
@@ -224,36 +250,86 @@ void ta_sem_post(tasem_t *sem) {
         struct node *temp = sem->blocked_h;
         temp->next = NULL;
         sem->blocked_h = sem->blocked_h->next;
-        list_insert_second(temp, head);
+        list_insert_second(temp, &head, &tail);
     }
 }
 
 void ta_sem_wait(tasem_t *sem) {
     //check
+   // if (head == NULL){
+	//	return;
+	//}
     while(sem->counter == 0) {
         struct node *temp = malloc(sizeof(struct node));
-        temp = head;
-        temp->next = NULL;
+/*        
+		temp = head;
+		temp->next = NULL;
+*/
+
+		temp->context = head->context;
+		temp->id = head->id;
+		struct node *temp2 = head;
+
+		temp->next = NULL;
         list_append(temp, &sem->blocked_h, &sem->blocked_t);
-        yield();
+//maybe what we need to do is have something in yield that says if came from ta_sem_wait vs from other thread (bc here it means that something was blocked and that you shouldn't add it to the end of the ready queue!)
+        came_from_sem = 1; //set true 
+        ta_yield();
+		free(temp2->context.uc_stack.ss_sp); //free the context
+        free(temp2); //free the node
     }
+		
+		
     //decrement
     sem->counter--;
 }
 
 void ta_lock_init(talock_t *mutex) {
+    /*
+    mutex->counter = 1;
+    mutex->id = lock_id;
+    lock_id ++;
+    mutex->blocked_h = NULL;
+    mutex->blocked_t = NULL;
+    */
+    
+	ta_sem_init(&mutex->lock, 1); //initialize lock with semaphore
 }
 
 void ta_lock_destroy(talock_t *mutex) {
+    //killed += list_clear(mutex->blocked_h);
+    
+	ta_sem_destroy(&mutex->lock);  
 }
 
 void ta_lock(talock_t *mutex) {
-
+/*
 //don't yield during critical section
+    mutex->counter++;
+    if(mutex->blocked_h != NULL) {
+        struct node *temp = mutex->blocked_h;
+        temp->next = NULL;
+        mutex->blocked_h = mutex->blocked_h->next;
+        list_insert_second(temp, head);
+    }
+*/
+    ta_sem_wait(&mutex->lock);
 
 }
 
 void ta_unlock(talock_t *mutex) {
+/*    
+    //check
+    while(mutex->counter == 0) {
+        struct node *temp =head;
+        temp->next = NULL;
+        list_append(temp, &mutex->blocked_h, &mutex->blocked_t);
+        ta_yield();
+    }
+    //decrement
+    mutex->counter--;
+*/
+    ta_sem_post(&mutex->lock);
 }
 
 
@@ -262,12 +338,20 @@ void ta_unlock(talock_t *mutex) {
    ***************************** */
 
 void ta_cond_init(tacond_t *cond) {
+	/*cond->var = 0;
+	cond->cond_h = NULL;
+	cond->cond_t = NULL;
+	*/
 }
 
 void ta_cond_destroy(tacond_t *cond) {
+	killed += list_clear(&cond->cond_h);
 }
 
 void ta_wait(talock_t *mutex, tacond_t *cond) {
+	/*while (cond->var ==0){
+		struct node *temp = head;*/
+	    
 }
 
 void ta_signal(tacond_t *cond) {

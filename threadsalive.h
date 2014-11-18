@@ -20,13 +20,20 @@ typedef struct {
 } tasem_t;
 
 typedef struct {
-    int value;
+    /*
+    int counter;
     int id;
     struct node *blocked_h;
     struct node *blocked_t;
+    */
+    tasem_t lock;
+
 } talock_t;
 
 typedef struct {
+	int var;
+	struct node cond_h;
+	struct node cond_t;
 
 } tacond_t;
 

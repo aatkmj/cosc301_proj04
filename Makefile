@@ -10,7 +10,7 @@ TESTPROG := $(patsubst %.c,%,$(wildcard test??.c))
 
 all: libthreadsalive.a $(TESTPROG) ctxtest
 
-libthreadsalive.a: threadsalive.o 
+libthreadsalive.a: threadsalive.o
 	$(AR) cruv $@ threadsalive.o 
 
 ctxtest: ctxtest.o

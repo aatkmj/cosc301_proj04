@@ -1,5 +1,6 @@
 #ifndef __LIST_H__
 #define __LIST_H__
+#include <ucontext.h>
 
 /* your list data structure declarations */
 struct node {
@@ -10,10 +11,10 @@ struct node {
 
 /* your function declarations associated with the list */
 
-void list_clear(struct node *list);
+int list_clear(struct node *list);
 void list_print(const struct node *list);
 void list_append(struct node *added,struct node **head, struct node **tail);
-void list_insert_second(struct node *curr, struct node *head);
+void list_insert_second(struct node *curr, struct node **head, struct node **tail);
 
 
 #endif // __LIST_H__
