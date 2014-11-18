@@ -158,14 +158,19 @@ void ta_yield(void) {
     	swapcontext(&tail->context, &head->context); 
 	}
 	else {
-		struct node *temp = head;
+		//struct node *temp = head;
 		if (head != NULL) {
 			if (head->next == NULL){
 				return;
 			}
+			struct node *temp2 = head;
+			ucontext_t swap_temp = head->context;	
 			head = head->next;
+
 			came_from_sem = 0; //reset to 0 before leave function 
-			swapcontext(&temp->context, &head->context);		
+			swapcontext(&swap_temp, &head->context);
+			free(temp2->context.uc_stack.ss_sp); //free the context
+			free(temp2); //free node		
 		}
 	}
     
@@ -197,6 +202,7 @@ int ta_waitall(void) {
         head = head->next;
         free(temp->context.uc_stack.ss_sp); //free the context
         free(temp); //free the node
+		
         swapcontext (&main_thread, &head->context);
     }
 	if (head != NULL) {
@@ -248,8 +254,9 @@ void ta_sem_post(tasem_t *sem) {
     sem->counter++;
     if(sem->blocked_h != NULL) {
         struct node *temp = sem->blocked_h;
+		sem->blocked_h = sem->blocked_h->next;
         temp->next = NULL;
-        sem->blocked_h = sem->blocked_h->next;
+        
         list_insert_second(temp, &head, &tail);
     }
 }
@@ -268,17 +275,14 @@ void ta_sem_wait(tasem_t *sem) {
 
 		temp->context = head->context;
 		temp->id = head->id;
-		struct node *temp2 = head;
-
 		temp->next = NULL;
         list_append(temp, &sem->blocked_h, &sem->blocked_t);
 //maybe what we need to do is have something in yield that says if came from ta_sem_wait vs from other thread (bc here it means that something was blocked and that you shouldn't add it to the end of the ready queue!)
         came_from_sem = 1; //set true 
         ta_yield();
-		free(temp2->context.uc_stack.ss_sp); //free the context
-        free(temp2); //free the node
+
     }
-		
+
 		
     //decrement
     sem->counter--;
