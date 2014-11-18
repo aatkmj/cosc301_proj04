@@ -352,7 +352,7 @@ void ta_cond_destroy(tacond_t *cond) {
 }
 
 void ta_wait(talock_t *mutex, tacond_t *cond) {
-	while (cond->var ==0){
+	while (cond->var == 0){
 	  //put all threads on blocked queue when cond = false
  		struct node *temp = malloc(sizeof(struct node));
 		temp->context = head->context;
@@ -366,7 +366,7 @@ void ta_wait(talock_t *mutex, tacond_t *cond) {
 
 	}   
 	if (cond->var == 1){
-		ta_lock(mutex);
+		ta_lock(mutex); //try to get lock again
 	//allow threads to pass through to critical section. (don't need to do anything here threads will just fall on through to critical section.)
 	}
 }
